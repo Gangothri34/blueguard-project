@@ -1,0 +1,52 @@
+#include <SPI.h>
+#include <LoRa.h>
+
+#define SS D8
+#define RST D0
+#define DIO0 D2
+#define SOS_PIN D1  
+
+int prevSOSState = HIGH; // previous button state, HIGH = not pressed
+
+void setup() { 
+  Serial.begin(9600);
+  pinMode(SOS_PIN, INPUT_PULLUP);  // push button pressed = LOW
+
+  LoRa.setPins(SS, RST, DIO0);
+  if (!LoRa.begin(433E6)) {  // check your module frequency
+    Serial.println("LoRa init failed!");
+    while (1);
+  }
+  LoRa.setTxPower(5);
+  Serial.println("LoRa Sender Ready");
+}
+
+void loop() {
+  int sosState = digitalRead(SOS_PIN); // current button state
+
+  // Check for state change: not pressed → pressed
+  if (prevSOSState == HIGH && sosState == LOW) {
+    // Create JSON packet with dummy sensor data + SOS
+    String payload = "{";
+    payload += "\"id\":\"Buoy1\",";
+    payload += "\"type\":\"SENSOR\",";
+    payload += "\"wind_speed\":65,";     
+    payload += "\"water_level\":3.2,";
+    payload += "\"humidity\":80,";
+    payload += "\"temperature\":27,";
+    payload += "\"SOS\":1";
+    payload += "}";
+
+    // Send LoRa packet immediately
+    LoRa.beginPacket();
+    LoRa.print(payload);
+    LoRa.endPacket();
+
+    Serial.println("🚨 SOS Sent: " + payload);
+  }
+
+  // Save current state as previous for next loop
+  prevSOSState = sosState;
+
+  delay(10); // tiny delay to avoid bouncing
+}
